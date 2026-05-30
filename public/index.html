@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>恒达海外客户开发CRM</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">HD</div>
+        <h1>恒达海外客户开发CRM</h1>
+        <p>玻纤纱与玻纤布客户线索、邮件草稿、跟进状态统一管理。</p>
+      </div>
+
+      <nav class="nav-group" aria-label="工作台">
+        <div class="nav-title">工作台</div>
+        <button class="nav-item active" type="button" data-target="leadSection"><span>01</span>客户线索</button>
+        <button class="nav-item" type="button" data-target="draftSection"><span>02</span>邮件草稿</button>
+        <button class="nav-item" type="button" data-target="followupSection"><span>03</span>跟进任务</button>
+      </nav>
+
+      <nav class="nav-group" aria-label="基础资料">
+        <div class="nav-title">基础资料</div>
+        <button class="nav-item" type="button" data-target="productSection"><span>04</span>产品资料</button>
+        <button class="nav-item" type="button" data-target="templateSection"><span>05</span>邮件模板</button>
+        <button class="nav-item" type="button" data-target="settingsSection"><span>06</span>系统设置</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <strong>发信策略</strong>
+        <p>第一版只允许单封发送。每封邮件发送前检查来源、退订状态与退订说明。</p>
+      </div>
+    </aside>
+
+    <section class="main">
+      <header class="topbar">
+        <div class="page-title">
+          <div>
+            <h2>客户线索工作台</h2>
+            <p>美国、欧洲、中东、东南亚市场 · 本地MVP · 预留多人字段</p>
+          </div>
+          <span class="status-pill">SMTP: smtp.zmail300.cn</span>
+        </div>
+        <div class="top-actions">
+          <input id="searchInput" class="search" type="search" placeholder="搜索公司、国家、邮箱或行业" autocomplete="off">
+          <button id="refreshButton" class="btn icon-btn" type="button" title="刷新数据" aria-label="刷新数据">↻</button>
+          <button id="addLeadButton" class="btn primary" type="button">新增线索</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <div id="notice" class="notice" hidden></div>
+
+        <section class="metrics" id="metrics" aria-label="销售指标"></section>
+
+        <section class="work-grid">
+          <section class="panel" id="leadSection">
+            <div class="panel-head">
+              <div>
+                <h3>客户线索列表</h3>
+                <p>先记录来源，再生成草稿；欧洲客户默认进入谨慎联系流程。</p>
+              </div>
+              <div class="panel-actions">
+                <select id="regionFilter" class="compact-select" aria-label="区域筛选">
+                  <option value="">全部区域</option>
+                  <option value="USA">美国</option>
+                  <option value="Europe">欧洲</option>
+                  <option value="Middle East">中东</option>
+                  <option value="Southeast Asia">东南亚</option>
+                </select>
+                <button id="editLeadButton" class="btn" type="button">编辑线索</button>
+                <button id="generateDraftButton" class="btn" type="button">生成草稿</button>
+              </div>
+            </div>
+            <div id="leadTable" class="table-wrap"></div>
+          </section>
+
+          <div class="detail">
+            <section class="panel" id="draftSection">
+              <div class="panel-head">
+                <div>
+                  <h3>英文邮件草稿</h3>
+                  <p>有API Key时用AI生成；没有时使用固定模板。</p>
+                </div>
+                <span id="draftModeTag" class="tag blue">待生成</span>
+              </div>
+              <div id="draftPanel" class="draft-body"></div>
+            </section>
+
+            <section class="panel" id="eventSection">
+              <div class="panel-head">
+                <div>
+                  <h3>跟进记录</h3>
+                  <p>围绕单个客户记录沟通状态。</p>
+                </div>
+              </div>
+              <div id="eventList" class="activity"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel secondary-panel" id="productSection">
+          <div class="panel-head">
+            <div>
+              <h3>产品资料</h3>
+              <p>规格允许为空；未确认的参数不会进入客户邮件。</p>
+            </div>
+            <button id="addProductButton" class="btn" type="button">新增产品资料</button>
+          </div>
+          <div id="productList" class="table-wrap"></div>
+        </section>
+
+        <section class="panel secondary-panel" id="followupSection">
+          <div class="panel-head">
+            <div>
+              <h3>跟进任务</h3>
+              <p>只显示到期且未退订的客户；跟进邮件仍需人工审核后单封发送。</p>
+            </div>
+          </div>
+          <div id="followupList" class="table-wrap"></div>
+        </section>
+
+        <section class="panel secondary-panel" id="templateSection">
+          <div class="panel-head">
+            <div>
+              <h3>邮件模板</h3>
+              <p>首封、跟进和客户回复模板按类别生成英文草稿。</p>
+            </div>
+          </div>
+          <div id="templateList" class="table-wrap"></div>
+        </section>
+
+        <section class="panel secondary-panel" id="settingsSection">
+          <div class="panel-head">
+            <div>
+              <h3>系统设置</h3>
+              <p>SMTP和AI设置保存在本地数据库；密钥不会在页面回显。</p>
+            </div>
+          </div>
+          <form id="settingsForm" class="settings-grid">
+            <label class="field">SMTP服务器
+              <input class="input" name="SMTP_HOST" value="smtp.zmail300.cn">
+            </label>
+            <label class="field">SMTP端口
+              <input class="input" name="SMTP_PORT" value="465">
+            </label>
+            <label class="field">SMTP用户名
+              <input class="input" name="SMTP_USER" value="sales@hengdaboxian.com">
+            </label>
+            <label class="field">SMTP发件人
+              <input class="input" name="SMTP_FROM" value="sales@hengdaboxian.com">
+            </label>
+            <label class="field">SMTP密码
+              <input class="input" name="SMTP_PASS" type="password" placeholder="留空表示不修改已保存密码">
+            </label>
+            <label class="field">AI Provider
+              <input class="input" name="AI_PROVIDER" placeholder="openai">
+            </label>
+            <label class="field">AI Model
+              <input class="input" name="AI_MODEL" placeholder="gpt-4.1-mini">
+            </label>
+            <label class="field">AI API Key
+              <input class="input" name="AI_API_KEY" type="password" placeholder="留空表示不修改已保存Key">
+            </label>
+            <div class="modal-actions wide">
+              <button class="btn primary" type="submit">保存设置</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <dialog id="leadDialog" class="modal">
+    <form id="leadForm" method="dialog">
+      <div class="modal-head">
+        <h3>新增客户线索</h3>
+        <button class="btn icon-btn" type="button" data-close-dialog="leadDialog" aria-label="关闭">×</button>
+      </div>
+      <div class="form-grid">
+        <label class="field">公司名称
+          <input class="input" name="company_name" required>
+        </label>
+        <label class="field">邮箱
+          <input class="input" name="email" type="email">
+        </label>
+        <label class="field">联系人
+          <input class="input" name="contact_name">
+        </label>
+        <label class="field">状态
+          <select class="input" name="status">
+            <option value="New">新线索</option>
+            <option value="Drafted">已生成草稿</option>
+            <option value="Sent">已发送</option>
+            <option value="Replied">已回复</option>
+            <option value="Not Interested">无兴趣</option>
+            <option value="Unsubscribed">已退订</option>
+          </select>
+        </label>
+        <label class="field">国家/地区
+          <input class="input" name="country_region">
+        </label>
+        <label class="field">市场区域
+          <select class="input" name="market_region">
+            <option value="USA">美国</option>
+            <option value="Europe">欧洲</option>
+            <option value="Middle East">中东</option>
+            <option value="Southeast Asia">东南亚</option>
+          </select>
+        </label>
+        <label class="field">行业
+          <input class="input" name="industry">
+        </label>
+        <label class="field">匹配产品
+          <select class="input" name="product_fit">
+            <option value="Both">玻纤纱 + 玻纤布</option>
+            <option value="Fiberglass Yarn">玻纤纱</option>
+            <option value="Fiberglass Fabric">玻纤布</option>
+          </select>
+        </label>
+        <label class="field wide">公司网站
+          <input class="input" name="website" type="url">
+        </label>
+        <label class="field wide">来源URL
+          <input class="input" name="source_url" type="url">
+        </label>
+        <label class="field">跟进日期
+          <input class="input" name="next_follow_up_at" type="datetime-local">
+        </label>
+        <label class="field">负责人
+          <input class="input" name="owner_name" value="Default">
+        </label>
+        <label class="field wide">匹配原因
+          <input class="input" name="fit_reason">
+        </label>
+        <label class="field wide">备注
+          <textarea name="notes" rows="4"></textarea>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close-dialog="leadDialog">取消</button>
+        <button class="btn primary" type="submit">保存线索</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="productDialog" class="modal">
+    <form id="productForm" method="dialog">
+      <div class="modal-head">
+        <h3>新增产品资料</h3>
+        <button class="btn icon-btn" type="button" data-close-dialog="productDialog" aria-label="关闭">×</button>
+      </div>
+      <div class="form-grid">
+        <label class="field">产品类别
+          <select class="input" name="product_category" required>
+            <option value="Fiberglass Yarn">Fiberglass Yarn</option>
+            <option value="Fiberglass Fabric">Fiberglass Fabric</option>
+          </select>
+        </label>
+        <label class="field">产品名称
+          <input class="input" name="product_name">
+        </label>
+        <label class="field wide">产品类型
+          <input class="input" name="product_type">
+        </label>
+        <label class="field wide">主要用途
+          <input class="input" name="main_applications">
+        </label>
+        <label class="field wide">内部备注
+          <textarea name="internal_notes" rows="4"></textarea>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close-dialog="productDialog">取消</button>
+        <button class="btn primary" type="submit">保存产品</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

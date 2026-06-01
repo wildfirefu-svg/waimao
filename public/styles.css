@@ -304,6 +304,18 @@ textarea:focus {
   font-size: 17px;
 }
 
+.compact-action {
+  min-width: 56px;
+  height: 30px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.danger-action {
+  color: var(--red);
+  border-color: #f0b7b1;
+}
+
 .workspace {
   padding: 20px 24px 26px;
   display: grid;
@@ -661,6 +673,58 @@ textarea {
   background: var(--teal-soft);
 }
 
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.source-box {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.wide-source {
+  grid-column: 1 / -1;
+}
+
+.source-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.crawler-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.source-textarea {
+  min-height: 126px;
+}
+
+.compact-source-textarea {
+  min-height: 92px;
+}
+
+.source-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.file-input {
+  max-width: 240px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .activity {
   padding: 14px 16px 16px;
   display: grid;
@@ -737,6 +801,14 @@ textarea {
   padding: 16px;
 }
 
+.form-note {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -771,6 +843,10 @@ textarea {
   }
 
   .work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .source-grid {
     grid-template-columns: 1fr;
   }
 }

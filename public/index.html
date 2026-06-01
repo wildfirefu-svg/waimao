@@ -20,13 +20,14 @@
         <button class="nav-item active" type="button" data-target="leadSection"><span>01</span>客户线索</button>
         <button class="nav-item" type="button" data-target="draftSection"><span>02</span>邮件草稿</button>
         <button class="nav-item" type="button" data-target="followupSection"><span>03</span>跟进任务</button>
+        <button class="nav-item" type="button" data-target="sourceSection"><span>04</span>采集中心</button>
       </nav>
 
       <nav class="nav-group" aria-label="基础资料">
         <div class="nav-title">基础资料</div>
-        <button class="nav-item" type="button" data-target="productSection"><span>04</span>产品资料</button>
-        <button class="nav-item" type="button" data-target="templateSection"><span>05</span>邮件模板</button>
-        <button class="nav-item" type="button" data-target="settingsSection"><span>06</span>系统设置</button>
+        <button class="nav-item" type="button" data-target="productSection"><span>05</span>产品资料</button>
+        <button class="nav-item" type="button" data-target="templateSection"><span>06</span>邮件模板</button>
+        <button class="nav-item" type="button" data-target="settingsSection"><span>07</span>系统设置</button>
       </nav>
 
       <div class="sidebar-foot">
@@ -102,6 +103,116 @@
           </div>
         </section>
 
+        <section class="panel secondary-panel" id="sourceSection">
+          <div class="panel-head">
+            <div>
+              <h3>线索采集中心</h3>
+              <p>支持展会、官网、B2B、海关数据、LinkedIn来源；先入待审核池，再人工导入CRM。</p>
+            </div>
+          </div>
+          <div class="source-grid">
+            <form id="sourceCsvForm" class="source-box">
+              <div class="source-row">
+                <label class="field">来源类型
+                  <select class="input" name="source_type">
+                    <option value="Trade Show">展会</option>
+                    <option value="Website">官网</option>
+                    <option value="B2B">B2B</option>
+                    <option value="Customs Data">海关数据</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                  </select>
+                </label>
+                <label class="field">来源名称
+                  <input class="input" name="source_name" placeholder="展会名、平台名或数据批次">
+                </label>
+                <label class="field">市场区域
+                  <select class="input" name="market_region">
+                    <option value="">待判断</option>
+                    <option value="USA">美国</option>
+                    <option value="Europe">欧洲</option>
+                    <option value="Middle East">中东</option>
+                    <option value="Southeast Asia">东南亚</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field wide">CSV内容
+                <textarea class="source-textarea" name="csv_text" placeholder="company_name,website,email,country_region,industry&#10;Example Co,https://example.com,info@example.com,USA,composite materials"></textarea>
+              </label>
+              <div class="source-actions">
+                <input id="sourceCsvFile" class="file-input" type="file" accept=".csv,text/csv">
+                <button class="btn primary" type="submit">导入CSV线索</button>
+              </div>
+            </form>
+
+            <form id="sourceUrlForm" class="source-box">
+              <div class="source-row">
+                <label class="field">来源类型
+                  <select class="input" name="source_type">
+                    <option value="Website">官网</option>
+                    <option value="B2B">B2B</option>
+                    <option value="Trade Show">展会</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                  </select>
+                </label>
+                <label class="field">来源名称
+                  <input class="input" name="source_name" placeholder="官网采集、平台页或展商页">
+                </label>
+                <label class="field">市场区域
+                  <select class="input" name="market_region">
+                    <option value="">待判断</option>
+                    <option value="USA">美国</option>
+                    <option value="Europe">欧洲</option>
+                    <option value="Middle East">中东</option>
+                    <option value="Southeast Asia">东南亚</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field wide">公开URL列表
+                <textarea class="source-textarea" name="urls" placeholder="每行一个公开网页URL，例如公司官网、展商公开页、B2B公开商家页"></textarea>
+              </label>
+              <div class="source-actions">
+                <span class="form-note">每次最多采集20个公开URL。</span>
+                <button class="btn primary" type="submit">采集公开URL</button>
+              </div>
+            </form>
+
+            <form id="sourceCrawlerForm" class="source-box wide-source">
+              <div class="source-row crawler-row">
+                <label class="field">来源类型
+                  <select class="input" name="source_type">
+                    <option value="Website">官网</option>
+                    <option value="B2B">B2B</option>
+                    <option value="Trade Show">展会</option>
+                  </select>
+                </label>
+                <label class="field">来源名称
+                  <input class="input" name="source_name" placeholder="同域公开爬虫">
+                </label>
+                <label class="field">市场区域
+                  <select class="input" name="market_region">
+                    <option value="">待判断</option>
+                    <option value="USA">美国</option>
+                    <option value="Europe">欧洲</option>
+                    <option value="Middle East">中东</option>
+                    <option value="Southeast Asia">东南亚</option>
+                  </select>
+                </label>
+                <label class="field">每站页数
+                  <input class="input" name="max_pages" type="number" min="1" max="12" value="5">
+                </label>
+              </div>
+              <label class="field wide">官网/公开页面起始URL
+                <textarea class="source-textarea compact-source-textarea" name="urls" placeholder="每行一个起始URL。系统只跟随同一域名内的公开链接，优先抓取联系、关于、产品页面。"></textarea>
+              </label>
+              <div class="source-actions">
+                <span class="form-note">每次最多10个站点；不登录、不绕过验证码。</span>
+                <button class="btn primary" type="submit">启动爬虫MVP</button>
+              </div>
+            </form>
+          </div>
+          <div id="sourcedLeadList" class="table-wrap"></div>
+        </section>
+
         <section class="panel secondary-panel" id="productSection">
           <div class="panel-head">
             <div>
@@ -129,6 +240,7 @@
               <h3>邮件模板</h3>
               <p>首封、跟进和客户回复模板按类别生成英文草稿。</p>
             </div>
+            <button id="addTemplateButton" class="btn" type="button">新增模板</button>
           </div>
           <div id="templateList" class="table-wrap"></div>
         </section>
@@ -157,10 +269,10 @@
               <input class="input" name="SMTP_PASS" type="password" placeholder="留空表示不修改已保存密码">
             </label>
             <label class="field">AI Provider
-              <input class="input" name="AI_PROVIDER" placeholder="openai">
+              <input class="input" name="AI_PROVIDER" placeholder="deepseek">
             </label>
             <label class="field">AI Model
-              <input class="input" name="AI_MODEL" placeholder="gpt-4.1-mini">
+              <input class="input" name="AI_MODEL" placeholder="deepseek-flash">
             </label>
             <label class="field">AI API Key
               <input class="input" name="AI_API_KEY" type="password" placeholder="留空表示不修改已保存Key">
@@ -250,7 +362,7 @@
   <dialog id="productDialog" class="modal">
     <form id="productForm" method="dialog">
       <div class="modal-head">
-        <h3>新增产品资料</h3>
+        <h3 id="productDialogTitle">新增产品资料</h3>
         <button class="btn icon-btn" type="button" data-close-dialog="productDialog" aria-label="关闭">×</button>
       </div>
       <div class="form-grid">
@@ -263,11 +375,50 @@
         <label class="field">产品名称
           <input class="input" name="product_name">
         </label>
-        <label class="field wide">产品类型
+        <label class="field">产品类型
           <input class="input" name="product_type">
+        </label>
+        <label class="field">材质/玻璃类型
+          <input class="input" name="material_or_glass_type">
+        </label>
+        <label class="field">型号/规格
+          <input class="input" name="model_specification">
+        </label>
+        <label class="field">线密度/Tex
+          <input class="input" name="linear_density_tex">
+        </label>
+        <label class="field">克重/重量
+          <input class="input" name="weight">
+        </label>
+        <label class="field">宽度
+          <input class="input" name="width">
+        </label>
+        <label class="field">卷长
+          <input class="input" name="roll_length">
+        </label>
+        <label class="field">颜色
+          <input class="input" name="color">
+        </label>
+        <label class="field">耐温
+          <input class="input" name="temperature_resistance">
+        </label>
+        <label class="field">表面处理
+          <input class="input" name="surface_treatment">
+        </label>
+        <label class="field">包装
+          <input class="input" name="packaging">
+        </label>
+        <label class="field">MOQ
+          <input class="input" name="moq">
+        </label>
+        <label class="field wide">定制选项
+          <input class="input" name="customization_options">
         </label>
         <label class="field wide">主要用途
           <input class="input" name="main_applications">
+        </label>
+        <label class="field wide">可提供文件
+          <input class="input" name="available_documents" placeholder="TDS / COA / sample / quotation">
         </label>
         <label class="field wide">内部备注
           <textarea name="internal_notes" rows="4"></textarea>
@@ -276,6 +427,63 @@
       <div class="modal-actions">
         <button class="btn" type="button" data-close-dialog="productDialog">取消</button>
         <button class="btn primary" type="submit">保存产品</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="draftProductDialog" class="modal">
+    <form id="draftProductForm" method="dialog">
+      <div class="modal-head">
+        <h3>生成英文邮件草稿</h3>
+        <button class="btn icon-btn" type="button" data-close-dialog="draftProductDialog" aria-label="关闭">×</button>
+      </div>
+      <div class="form-grid">
+        <label class="field">生成方式
+          <select id="draftModeSelect" class="input" name="generation_mode">
+            <option value="ai">AI自动生成</option>
+            <option value="template">使用邮件模板</option>
+          </select>
+        </label>
+        <label class="field">邮件模板
+          <select id="draftTemplateSelect" class="input" name="template_id"></select>
+        </label>
+        <label class="field wide">产品资料
+          <select id="draftProductSelect" class="input" name="product_id">
+            <option value="">不引用产品资料</option>
+          </select>
+        </label>
+        <p class="form-note wide">系统只会引用已填写的公开产品字段；内部备注不会进入客户邮件。</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close-dialog="draftProductDialog">取消</button>
+        <button class="btn primary" type="submit">生成草稿</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="templateDialog" class="modal">
+    <form id="templateForm" method="dialog">
+      <div class="modal-head">
+        <h3 id="templateDialogTitle">新增邮件模板</h3>
+        <button class="btn icon-btn" type="button" data-close-dialog="templateDialog" aria-label="关闭">×</button>
+      </div>
+      <div class="form-grid">
+        <label class="field">模板键
+          <input class="input" name="template_key" placeholder="new-template" required>
+        </label>
+        <label class="field">用途名称
+          <input class="input" name="label" placeholder="First contact for distributor" required>
+        </label>
+        <label class="field wide">英文标题
+          <input class="input" name="subject" required>
+        </label>
+        <label class="field wide">英文正文
+          <textarea name="body" rows="12" required></textarea>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close-dialog="templateDialog">取消</button>
+        <button class="btn primary" type="submit">保存模板</button>
       </div>
     </form>
   </dialog>

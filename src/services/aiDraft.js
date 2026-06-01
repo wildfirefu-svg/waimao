@@ -1,8 +1,26 @@
-import { renderDraftFromTemplate } from './templates.js';
+import { productReferenceLines, renderDraftFromTemplate } from './templates.js';
 
-const SUPPORTED_PROVIDERS = new Set(['openai']);
+const PROVIDERS = {
+  openai: {
+    url: 'https://api.openai.com/v1/chat/completions',
+    defaultModel: 'gpt-4.1-mini'
+  },
+  deepseek: {
+    url: 'https://api.deepseek.com/chat/completions',
+    defaultModel: 'deepseek-flash'
+  }
+};
 
-function buildPrompt(lead, company) {
+function productPrompt(product) {
+  const lines = productReferenceLines(product);
+  if (!lines.length) return '';
+  return `Selected product information:
+${lines.map((line) => `- ${line}`).join('\n')}
+
+`;
+}
+
+function buildPrompt(lead, company, product = null) {
   return `Write a concise English first-contact sales email.
 
 Company sending: ${company.name}
@@ -18,6 +36,7 @@ Product fit: ${lead.product_fit || 'Both'}
 Fit reason: ${lead.fit_reason || ''}
 Notes: ${lead.notes || ''}
 
+${productPrompt(product)}
 Rules:
 - Use only the facts above.
 - Do not invent certifications, production capacity, export countries, famous customers, technical parameters, lowest price, or best quality claims.
@@ -26,28 +45,29 @@ Rules:
 - Return JSON with "subject" and "body" strings only.`;
 }
 
-function fallbackDraft(lead, company, provider = '', requestedTemplate) {
+function fallbackDraft(lead, company, provider = '', requestedTemplate, product = null) {
   return {
-    ...renderDraftFromTemplate(lead, company, requestedTemplate),
+    ...renderDraftFromTemplate(lead, company, requestedTemplate, product),
     fallback_reason: provider ? 'ai_unavailable' : 'ai_not_configured'
   };
 }
 
-export async function generateDraft(lead, company, aiConfig = {}, requestedTemplate) {
+export async function generateDraft(lead, company, aiConfig = {}, requestedTemplate, product = null) {
   const provider = (aiConfig.provider || '').toLowerCase();
-  if (!provider || !aiConfig.apiKey || !SUPPORTED_PROVIDERS.has(provider)) {
-    return fallbackDraft(lead, company, provider, requestedTemplate);
+  const providerConfig = PROVIDERS[provider];
+  if (!provider || !aiConfig.apiKey || !providerConfig) {
+    return fallbackDraft(lead, company, provider, requestedTemplate, product);
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(providerConfig.url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${aiConfig.apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: aiConfig.model || 'gpt-4.1-mini',
+        model: aiConfig.model || providerConfig.defaultModel,
         messages: [
           {
             role: 'system',
@@ -55,7 +75,7 @@ export async function generateDraft(lead, company, aiConfig = {}, requestedTempl
           },
           {
             role: 'user',
-            content: buildPrompt(lead, company)
+            content: buildPrompt(lead, company, product)
           }
         ],
         response_format: { type: 'json_object' },
@@ -63,13 +83,13 @@ export async function generateDraft(lead, company, aiConfig = {}, requestedTempl
       })
     });
 
-    if (!response.ok) return fallbackDraft(lead, company, provider, requestedTemplate);
+    if (!response.ok) return fallbackDraft(lead, company, provider, requestedTemplate, product);
 
     const payload = await response.json();
     const content = payload.choices?.[0]?.message?.content;
     const parsed = JSON.parse(content || '{}');
     if (!parsed.subject || !parsed.body || !/unsubscribe/i.test(parsed.body)) {
-      return fallbackDraft(lead, company, provider, requestedTemplate);
+      return fallbackDraft(lead, company, provider, requestedTemplate, product);
     }
 
     return {
@@ -80,6 +100,6 @@ export async function generateDraft(lead, company, aiConfig = {}, requestedTempl
       ai_provider: provider
     };
   } catch {
-    return fallbackDraft(lead, company, provider, requestedTemplate);
+    return fallbackDraft(lead, company, provider, requestedTemplate, product);
   }
 }

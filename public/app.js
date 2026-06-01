@@ -3,12 +3,15 @@ const state = {
   drafts: [],
   events: [],
   products: [],
+  sourcedLeads: [],
   followups: [],
   templates: [],
   settings: [],
   selectedLeadId: null,
   selectedDraftId: null,
   editingLeadId: null,
+  editingProductId: null,
+  editingTemplateId: null,
   search: '',
   region: '',
   busy: false
@@ -22,6 +25,7 @@ const els = {
   draftModeTag: document.querySelector('#draftModeTag'),
   eventList: document.querySelector('#eventList'),
   productList: document.querySelector('#productList'),
+  sourcedLeadList: document.querySelector('#sourcedLeadList'),
   followupList: document.querySelector('#followupList'),
   templateList: document.querySelector('#templateList'),
   settingsForm: document.querySelector('#settingsForm'),
@@ -30,7 +34,20 @@ const els = {
   leadDialog: document.querySelector('#leadDialog'),
   leadForm: document.querySelector('#leadForm'),
   productDialog: document.querySelector('#productDialog'),
-  productForm: document.querySelector('#productForm')
+  productDialogTitle: document.querySelector('#productDialogTitle'),
+  productForm: document.querySelector('#productForm'),
+  draftProductDialog: document.querySelector('#draftProductDialog'),
+  draftProductForm: document.querySelector('#draftProductForm'),
+  draftProductSelect: document.querySelector('#draftProductSelect'),
+  draftModeSelect: document.querySelector('#draftModeSelect'),
+  draftTemplateSelect: document.querySelector('#draftTemplateSelect'),
+  templateDialog: document.querySelector('#templateDialog'),
+  templateDialogTitle: document.querySelector('#templateDialogTitle'),
+  templateForm: document.querySelector('#templateForm'),
+  sourceCsvForm: document.querySelector('#sourceCsvForm'),
+  sourceUrlForm: document.querySelector('#sourceUrlForm'),
+  sourceCrawlerForm: document.querySelector('#sourceCrawlerForm'),
+  sourceCsvFile: document.querySelector('#sourceCsvFile')
 };
 
 async function api(path, options = {}) {
@@ -156,6 +173,43 @@ function regionLabel(value) {
     'Middle East': '中东',
     'Southeast Asia': '东南亚'
   }[value] || value || '';
+}
+
+function productOptionLabel(product) {
+  const parts = [
+    product.product_category,
+    product.product_name || product.product_type || '未命名产品',
+    product.model_specification
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function templateOptionLabel(template) {
+  return `${template.is_builtin ? '内置' : '自定义'} · ${template.label || template.template_key}`;
+}
+
+function sourceTypeLabel(value) {
+  return {
+    'Trade Show': '展会',
+    Website: '官网',
+    B2B: 'B2B',
+    'Customs Data': '海关数据',
+    LinkedIn: 'LinkedIn'
+  }[value] || value || '官网';
+}
+
+function sourceStatusLabel(value) {
+  return {
+    Review: '待审核',
+    Imported: '已导入',
+    Skipped: '已跳过'
+  }[value] || value || '待审核';
+}
+
+function scoreClass(score) {
+  if (Number(score) >= 70) return 'green';
+  if (Number(score) >= 40) return 'amber';
+  return 'blue';
 }
 
 function isEuropeRegion(value) {
@@ -333,11 +387,15 @@ function renderEvents() {
 function renderProducts() {
   const rows = state.products.map((product) => `
     <tr>
-      <td style="width: 18%">${escapeHtml(product.product_category || '')}</td>
-      <td style="width: 18%">${escapeHtml(product.product_name || '待补充')}</td>
-      <td style="width: 24%">${escapeHtml(product.product_type || '')}</td>
-      <td style="width: 25%">${escapeHtml(product.main_applications || '')}</td>
-      <td style="width: 15%">${escapeHtml(product.internal_notes || '')}</td>
+      <td style="width: 15%">${escapeHtml(product.product_category || '')}</td>
+      <td style="width: 17%">${escapeHtml(product.product_name || '待补充')}</td>
+      <td style="width: 18%">${escapeHtml(product.product_type || '')}</td>
+      <td style="width: 22%">${escapeHtml(product.model_specification || product.main_applications || '')}</td>
+      <td style="width: 16%">${escapeHtml(product.internal_notes || '')}</td>
+      <td style="width: 12%">
+        <button class="btn compact-action" type="button" data-product-id="${normalizeId(product.id)}">编辑</button>
+        <button class="btn compact-action danger-action" type="button" data-delete-product-id="${normalizeId(product.id)}">删除</button>
+      </td>
     </tr>
   `).join('');
 
@@ -348,13 +406,85 @@ function renderProducts() {
           <th>产品类别</th>
           <th>产品名称</th>
           <th>产品类型</th>
-          <th>主要用途</th>
+          <th>规格/用途</th>
           <th>内部备注</th>
+          <th>操作</th>
         </tr>
       </thead>
-      <tbody>${rows || '<tr><td colspan="5"><p class="empty">暂无产品资料。</p></td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="6"><p class="empty">暂无产品资料。</p></td></tr>'}</tbody>
     </table>
   `;
+
+  els.productList.querySelectorAll('[data-product-id]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const product = state.products.find((item) => normalizeId(item.id) === Number(button.dataset.productId));
+      setProductDialogMode(product);
+    });
+  });
+  els.productList.querySelectorAll('[data-delete-product-id]').forEach((button) => {
+    button.addEventListener('click', () => deleteProduct(Number(button.dataset.deleteProductId)));
+  });
+}
+
+function renderSourcedLeads() {
+  const rows = state.sourcedLeads.map((lead) => `
+    <tr>
+      <td style="width: 11%"><span class="tag blue">${escapeHtml(sourceTypeLabel(lead.source_type))}</span></td>
+      <td style="width: 22%">
+        <div class="company">${escapeHtml(lead.company_name || '待补充公司')}</div>
+        <div class="sub">${escapeHtml(lead.website || lead.source_url || '缺少网址')}</div>
+      </td>
+      <td style="width: 10%">${escapeHtml(regionLabel(lead.market_region) || lead.country_region || '待判断')}</td>
+      <td style="width: 15%">${escapeHtml(lead.email || '未提取')}</td>
+      <td style="width: 14%"><span class="tag teal">${escapeHtml(productFitLabel(lead.product_fit))}</span></td>
+      <td style="width: 10%"><span class="tag ${scoreClass(lead.match_score)}">${escapeHtml(lead.match_score || 0)}</span></td>
+      <td style="width: 8%"><span class="tag ${lead.status === 'Imported' ? 'green' : 'amber'}">${escapeHtml(sourceStatusLabel(lead.status))}</span></td>
+      <td style="width: 10%">
+        <button class="btn compact-action" type="button" data-import-source-id="${normalizeId(lead.id)}" ${lead.status === 'Imported' ? 'disabled' : ''}>导入</button>
+        <button class="btn compact-action danger-action" type="button" data-delete-source-id="${normalizeId(lead.id)}">删除</button>
+      </td>
+    </tr>
+  `).join('');
+
+  els.sourcedLeadList.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>来源</th>
+          <th>公司/网址</th>
+          <th>区域</th>
+          <th>邮箱</th>
+          <th>匹配产品</th>
+          <th>评分</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="8"><p class="empty">暂无采集线索。可以粘贴CSV或输入公开URL开始。</p></td></tr>'}</tbody>
+    </table>
+  `;
+
+  els.sourcedLeadList.querySelectorAll('[data-import-source-id]').forEach((button) => {
+    button.addEventListener('click', () => importSourcedLead(Number(button.dataset.importSourceId)));
+  });
+  els.sourcedLeadList.querySelectorAll('[data-delete-source-id]').forEach((button) => {
+    button.addEventListener('click', () => deleteSourcedLead(Number(button.dataset.deleteSourceId)));
+  });
+}
+
+function renderDraftProductSelect() {
+  els.draftProductSelect.innerHTML = `
+    <option value="">不引用产品资料</option>
+    ${state.products.map((product) => `
+      <option value="${normalizeId(product.id)}">${escapeHtml(productOptionLabel(product))}</option>
+    `).join('')}
+  `;
+}
+
+function renderDraftTemplateSelect() {
+  els.draftTemplateSelect.innerHTML = state.templates.map((template) => `
+    <option value="${normalizeId(template.id)}">${escapeHtml(templateOptionLabel(template))}</option>
+  `).join('');
 }
 
 function renderFollowups() {
@@ -387,14 +517,33 @@ function renderFollowups() {
 function renderTemplates() {
   els.templateList.innerHTML = `
     <table>
-      <thead><tr><th>模板键</th><th>用途</th></tr></thead>
+      <thead><tr><th>模板键</th><th>用途</th><th>标题</th><th>类型</th><th>操作</th></tr></thead>
       <tbody>
         ${state.templates.map((template) => `
-          <tr><td>${escapeHtml(template.key)}</td><td>${escapeHtml(template.label)}</td></tr>
-        `).join('') || '<tr><td colspan="2"><p class="empty">模板加载中。</p></td></tr>'}
+          <tr>
+            <td style="width: 16%">${escapeHtml(template.template_key)}</td>
+            <td style="width: 22%">${escapeHtml(template.label)}</td>
+            <td style="width: 32%">${escapeHtml(template.subject)}</td>
+            <td style="width: 10%"><span class="tag ${template.is_builtin ? 'blue' : 'teal'}">${template.is_builtin ? '内置' : '自定义'}</span></td>
+            <td style="width: 20%">
+              <button class="btn compact-action" type="button" data-template-id="${normalizeId(template.id)}">编辑</button>
+              <button class="btn compact-action danger-action" type="button" data-delete-template-id="${normalizeId(template.id)}" ${template.is_builtin ? 'disabled' : ''}>删除</button>
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="5"><p class="empty">模板加载中。</p></td></tr>'}
       </tbody>
     </table>
   `;
+
+  els.templateList.querySelectorAll('[data-template-id]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const template = state.templates.find((item) => normalizeId(item.id) === Number(button.dataset.templateId));
+      setTemplateDialogMode(template);
+    });
+  });
+  els.templateList.querySelectorAll('[data-delete-template-id]').forEach((button) => {
+    button.addEventListener('click', () => deleteTemplate(Number(button.dataset.deleteTemplateId)));
+  });
 }
 
 function fillSettingsForm() {
@@ -414,7 +563,10 @@ function render() {
   renderLeadTable();
   renderDraftPanel();
   renderEvents();
+  renderSourcedLeads();
   renderProducts();
+  renderDraftProductSelect();
+  renderDraftTemplateSelect();
   renderFollowups();
   renderTemplates();
   fillSettingsForm();
@@ -422,10 +574,11 @@ function render() {
 
 async function loadData({ silent = false } = {}) {
   if (!silent) setNotice('');
-  const [leadPayload, draftPayload, productPayload, followupPayload, templatePayload, settingPayload] = await Promise.all([
+  const [leadPayload, draftPayload, productPayload, sourcedLeadPayload, followupPayload, templatePayload, settingPayload] = await Promise.all([
     api('/api/leads'),
     api('/api/drafts'),
     api('/api/products'),
+    api('/api/sourced-leads'),
     api('/api/followups'),
     api('/api/templates'),
     api('/api/settings')
@@ -433,6 +586,7 @@ async function loadData({ silent = false } = {}) {
   state.leads = leadPayload.leads || [];
   state.drafts = draftPayload.drafts || [];
   state.products = productPayload.products || [];
+  state.sourcedLeads = sourcedLeadPayload.sourced_leads || [];
   state.followups = followupPayload.leads || [];
   state.templates = templatePayload.templates || [];
   state.settings = settingPayload.settings || [];
@@ -539,14 +693,40 @@ async function generateDraft() {
     setNotice('请先选择客户。', 'error');
     return;
   }
+  renderDraftProductSelect();
+  renderDraftTemplateSelect();
+  els.draftProductForm.reset();
+  syncDraftModeControls();
+  openDialog(els.draftProductDialog);
+}
+
+async function createDraftWithProduct(event) {
+  event.preventDefault();
+  if (!state.selectedLeadId) {
+    setNotice('请先选择客户。', 'error');
+    return;
+  }
+  const input = formPayload(els.draftProductForm);
+  const generationMode = input.generation_mode === 'template' ? 'template' : 'ai';
   await withAction(async () => {
     const payload = await api('/api/drafts/generate', {
       method: 'POST',
-      body: JSON.stringify({ lead_id: state.selectedLeadId })
+      body: JSON.stringify({
+        lead_id: state.selectedLeadId,
+        generation_mode: generationMode,
+        template_id: generationMode === 'template' ? input.template_id : '',
+        product_id: input.product_id || ''
+      })
     });
     state.selectedDraftId = normalizeId(payload.draft?.id);
+    els.draftProductDialog.close();
     await loadData({ silent: true });
   }, '英文邮件草稿已生成。');
+}
+
+function syncDraftModeControls() {
+  const useTemplate = els.draftModeSelect.value === 'template';
+  els.draftTemplateSelect.disabled = !useTemplate;
 }
 
 async function generateFollowupDraft(leadId, templateName) {
@@ -633,18 +813,160 @@ async function saveSettings(event) {
   }, '系统设置已保存。');
 }
 
-async function addProduct(event) {
+function setProductDialogMode(product) {
+  state.editingProductId = normalizeId(product?.id);
+  els.productDialogTitle.textContent = product ? '编辑产品资料' : '新增产品资料';
+  els.productForm.reset();
+  for (const control of els.productForm.elements) {
+    if (!control.name) continue;
+    control.value = product?.[control.name] || control.defaultValue || '';
+  }
+  openDialog(els.productDialog);
+}
+
+async function saveProduct(event) {
   event.preventDefault();
   const input = formPayload(els.productForm);
+  const isEditing = Boolean(state.editingProductId);
   await withAction(async () => {
-    await api('/api/products', {
-      method: 'POST',
+    const path = state.editingProductId ? `/api/products/${state.editingProductId}` : '/api/products';
+    const method = state.editingProductId ? 'PUT' : 'POST';
+    await api(path, {
+      method,
       body: JSON.stringify(input)
     });
     els.productForm.reset();
+    state.editingProductId = null;
     els.productDialog.close();
     await loadData({ silent: true });
-  }, '产品资料已保存。');
+  }, isEditing ? '产品资料已更新。' : '产品资料已保存。');
+}
+
+async function importCsvSourcedLeads(event) {
+  event.preventDefault();
+  const input = formPayload(els.sourceCsvForm);
+  if (!input.csv_text) {
+    setNotice('请先粘贴CSV内容。', 'error');
+    return;
+  }
+  await withAction(async () => {
+    const payload = await api('/api/sourced-leads/import-csv', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+    els.sourceCsvForm.elements.csv_text.value = '';
+    await loadData({ silent: true });
+    setNotice(`已导入 ${payload.created.length} 条采集线索，跳过 ${payload.skipped.length} 条重复。`, 'success');
+  });
+}
+
+async function collectUrlSourcedLeads(event) {
+  event.preventDefault();
+  const input = formPayload(els.sourceUrlForm);
+  if (!input.urls) {
+    setNotice('请先输入公开URL。', 'error');
+    return;
+  }
+  await withAction(async () => {
+    const payload = await api('/api/sourced-leads/collect-url', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+    els.sourceUrlForm.elements.urls.value = '';
+    await loadData({ silent: true });
+    const errorText = payload.errors.length ? `，失败 ${payload.errors.length} 条` : '';
+    setNotice(`已采集 ${payload.created.length} 条，跳过 ${payload.skipped.length} 条重复${errorText}。`, payload.errors.length ? '' : 'success');
+  });
+}
+
+async function crawlSiteSourcedLeads(event) {
+  event.preventDefault();
+  const input = formPayload(els.sourceCrawlerForm);
+  if (!input.urls) {
+    setNotice('请先输入起始URL。', 'error');
+    return;
+  }
+  await withAction(async () => {
+    const payload = await api('/api/sourced-leads/crawl-site', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+    els.sourceCrawlerForm.elements.urls.value = '';
+    await loadData({ silent: true });
+    const errorText = payload.errors.length ? `，失败 ${payload.errors.length} 个站点` : '';
+    setNotice(`爬虫已生成 ${payload.created.length} 条线索，跳过 ${payload.skipped.length} 条重复${errorText}。`, payload.errors.length ? '' : 'success');
+  });
+}
+
+async function importSourcedLead(id) {
+  await withAction(async () => {
+    const payload = await api(`/api/sourced-leads/${id}/import`, { method: 'POST' });
+    state.selectedLeadId = normalizeId(payload.lead?.id);
+    await loadData({ silent: true });
+    document.querySelector('#leadSection')?.scrollIntoView({ block: 'start' });
+  }, '采集线索已导入CRM。');
+}
+
+async function deleteSourcedLead(id) {
+  const sourcedLead = state.sourcedLeads.find((item) => normalizeId(item.id) === id);
+  if (!sourcedLead) return;
+  const confirmed = window.confirm(`确认删除采集线索“${sourcedLead.company_name || sourcedLead.website || sourcedLead.source_url}”？`);
+  if (!confirmed) return;
+  await withAction(async () => {
+    await api(`/api/sourced-leads/${id}`, { method: 'DELETE' });
+    await loadData({ silent: true });
+  }, '采集线索已删除。');
+}
+
+async function deleteProduct(id) {
+  const product = state.products.find((item) => normalizeId(item.id) === id);
+  if (!product) return;
+  const confirmed = window.confirm(`确认删除产品资料“${product.product_name || product.product_category}”？历史草稿不会受影响。`);
+  if (!confirmed) return;
+  await withAction(async () => {
+    await api(`/api/products/${id}`, { method: 'DELETE' });
+    await loadData({ silent: true });
+  }, '产品资料已删除。');
+}
+
+function setTemplateDialogMode(template) {
+  state.editingTemplateId = normalizeId(template?.id);
+  els.templateDialogTitle.textContent = template ? '编辑邮件模板' : '新增邮件模板';
+  els.templateForm.reset();
+  for (const control of els.templateForm.elements) {
+    if (!control.name) continue;
+    control.value = template?.[control.name] || control.defaultValue || '';
+  }
+  openDialog(els.templateDialog);
+}
+
+async function saveTemplate(event) {
+  event.preventDefault();
+  const input = formPayload(els.templateForm);
+  const isEditing = Boolean(state.editingTemplateId);
+  await withAction(async () => {
+    const path = state.editingTemplateId ? `/api/templates/${state.editingTemplateId}` : '/api/templates';
+    const method = state.editingTemplateId ? 'PUT' : 'POST';
+    await api(path, {
+      method,
+      body: JSON.stringify(input)
+    });
+    els.templateForm.reset();
+    state.editingTemplateId = null;
+    els.templateDialog.close();
+    await loadData({ silent: true });
+  }, isEditing ? '邮件模板已更新。' : '邮件模板已新增。');
+}
+
+async function deleteTemplate(id) {
+  const template = state.templates.find((item) => normalizeId(item.id) === id);
+  if (!template) return;
+  const confirmed = window.confirm(`确认删除邮件模板“${template.label || template.template_key}”？`);
+  if (!confirmed) return;
+  await withAction(async () => {
+    await api(`/api/templates/${id}`, { method: 'DELETE' });
+    await loadData({ silent: true });
+  }, '邮件模板已删除。');
 }
 
 function openDialog(dialog) {
@@ -662,11 +984,24 @@ function bindEvents() {
     if (!lead) return setNotice('请先选择客户。', 'error');
     setLeadDialogMode(lead);
   });
-  document.querySelector('#addProductButton').addEventListener('click', () => openDialog(els.productDialog));
+  document.querySelector('#addProductButton').addEventListener('click', () => setProductDialogMode(null));
+  document.querySelector('#addTemplateButton').addEventListener('click', () => setTemplateDialogMode(null));
   document.querySelector('#generateDraftButton').addEventListener('click', generateDraft);
   document.querySelector('#refreshButton').addEventListener('click', () => withAction(() => loadData({ silent: true }), '数据已刷新。'));
   els.leadForm.addEventListener('submit', saveLead);
-  els.productForm.addEventListener('submit', addProduct);
+  els.productForm.addEventListener('submit', saveProduct);
+  els.sourceCsvForm.addEventListener('submit', importCsvSourcedLeads);
+  els.sourceUrlForm.addEventListener('submit', collectUrlSourcedLeads);
+  els.sourceCrawlerForm.addEventListener('submit', crawlSiteSourcedLeads);
+  els.sourceCsvFile.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    els.sourceCsvForm.elements.csv_text.value = await file.text();
+    event.target.value = '';
+  });
+  els.draftProductForm.addEventListener('submit', createDraftWithProduct);
+  els.draftModeSelect.addEventListener('change', syncDraftModeControls);
+  els.templateForm.addEventListener('submit', saveTemplate);
   els.settingsForm.addEventListener('submit', saveSettings);
   els.searchInput.addEventListener('input', (event) => {
     state.search = event.target.value;

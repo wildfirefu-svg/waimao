@@ -52,7 +52,7 @@ export function createProduct(db, input) {
     input.moq || '',
     input.customization_options || '',
     input.main_applications || '',
-    input.available_documents || 'TDS / COA / sample / quotation',
+    input.available_documents || '',
     input.internal_notes || ''
   );
 
@@ -101,4 +101,9 @@ export function updateProduct(db, id, input) {
   );
 
   return getProduct(db, id);
+}
+
+export function deleteProduct(db, id) {
+  const result = db.prepare('DELETE FROM products WHERE id = ?').run(id);
+  return result.changes > 0;
 }

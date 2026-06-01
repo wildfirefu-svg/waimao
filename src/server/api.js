@@ -2,13 +2,16 @@ import { config } from '../config.js';
 import { createDraft, getDraft, listDrafts, listDraftsForLead, updateDraft } from '../repositories/drafts.js';
 import { createEvent, listEventsForLead } from '../repositories/events.js';
 import { createLead, deleteLead, getLead, listLeads, updateLead } from '../repositories/leads.js';
-import { createProduct, listProducts, updateProduct } from '../repositories/products.js';
+import { createProduct, deleteProduct, getProduct, listProducts, updateProduct } from '../repositories/products.js';
 import { getSettingsMap, listSettings, setSettings } from '../repositories/settings.js';
+import { createSourcedLead, deleteSourcedLead, findSourcedLeadDuplicate, getSourcedLead, listSourcedLeads, updateSourcedLead } from '../repositories/sourcedLeads.js';
+import { createTemplate, deleteTemplate, getTemplate, getTemplateByKey, listTemplates, updateTemplate } from '../repositories/templates.js';
 import { generateDraft } from '../services/aiDraft.js';
 import { validateDraftForSend } from '../services/compliance.js';
 import { listDueFollowups, nextFollowUpDate } from '../services/followups.js';
+import { collectPublicUrl, crawlPublicSite, parseLeadCsv } from '../services/leadSourcing.js';
 import { sendSingleEmail } from '../services/smtpMailer.js';
-import { listTemplateCategories, renderDraftFromTemplate } from '../services/templates.js';
+import { renderDraftFromTemplate } from '../services/templates.js';
 import { readJson, sendJson } from './router.js';
 
 function numericId(match) {
@@ -21,6 +24,32 @@ function badRequest(response, error) {
 
 function settingValue(settings, key, fallback) {
   return settings[key] ? settings[key] : fallback;
+}
+
+function selectedProduct(db, productId) {
+  if (!productId) return null;
+  return getProduct(db, Number(productId));
+}
+
+function selectedTemplate(db, templateId, templateKey) {
+  if (templateId) return getTemplate(db, Number(templateId));
+  if (templateKey) return getTemplateByKey(db, templateKey);
+  return null;
+}
+
+function existingLeadForSourcedLead(db, sourcedLead) {
+  if (sourcedLead.email) {
+    const byEmail = db.prepare('SELECT * FROM leads WHERE email = ? LIMIT 1').get(sourcedLead.email);
+    if (byEmail) return byEmail;
+  }
+  if (sourcedLead.website) {
+    const byWebsite = db.prepare('SELECT * FROM leads WHERE website = ? LIMIT 1').get(sourcedLead.website);
+    if (byWebsite) return byWebsite;
+  }
+  if (sourcedLead.company_name) {
+    return db.prepare('SELECT * FROM leads WHERE lower(company_name) = lower(?) LIMIT 1').get(sourcedLead.company_name);
+  }
+  return undefined;
 }
 
 function effectiveConfig(db, runtimeConfig) {
@@ -112,8 +141,95 @@ export async function handleApi(request, response, db, url, runtimeConfig = conf
     return sendJson(response, 200, { products: listProducts(db) });
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/sourced-leads') {
+    return sendJson(response, 200, { sourced_leads: listSourcedLeads(db) });
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/sourced-leads/import-csv') {
+    const body = await readJson(request);
+    const rows = parseLeadCsv(body.csv_text || '', {
+      source_type: body.source_type,
+      source_name: body.source_name,
+      market_region: body.market_region
+    });
+    const created = [];
+    const skipped = [];
+    for (const row of rows) {
+      const duplicate = findSourcedLeadDuplicate(db, row);
+      if (duplicate) {
+        skipped.push(duplicate);
+      } else {
+        created.push(createSourcedLead(db, row));
+      }
+    }
+    return sendJson(response, 201, { created, skipped });
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/sourced-leads/collect-url') {
+    const body = await readJson(request);
+    const urls = Array.isArray(body.urls)
+      ? body.urls
+      : String(body.urls || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const created = [];
+    const skipped = [];
+    const errors = [];
+    for (const sourceUrl of urls.slice(0, 20)) {
+      try {
+        const row = await collectPublicUrl(sourceUrl, {
+          source_type: body.source_type,
+          source_name: body.source_name,
+          market_region: body.market_region,
+          country_region: body.country_region,
+          industry: body.industry,
+          notes: body.notes
+        });
+        const duplicate = findSourcedLeadDuplicate(db, row);
+        if (duplicate) {
+          skipped.push(duplicate);
+        } else {
+          created.push(createSourcedLead(db, row));
+        }
+      } catch (error) {
+        errors.push({ url: sourceUrl, error: error.message });
+      }
+    }
+    return sendJson(response, 201, { created, skipped, errors });
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/sourced-leads/crawl-site') {
+    const body = await readJson(request);
+    const urls = Array.isArray(body.urls)
+      ? body.urls
+      : String(body.urls || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const created = [];
+    const skipped = [];
+    const errors = [];
+    for (const sourceUrl of urls.slice(0, 10)) {
+      try {
+        const row = await crawlPublicSite(sourceUrl, {
+          source_type: body.source_type,
+          source_name: body.source_name,
+          market_region: body.market_region,
+          country_region: body.country_region,
+          industry: body.industry,
+          notes: body.notes,
+          max_pages: body.max_pages
+        });
+        const duplicate = findSourcedLeadDuplicate(db, row);
+        if (duplicate) {
+          skipped.push(duplicate);
+        } else {
+          created.push(createSourcedLead(db, row));
+        }
+      } catch (error) {
+        errors.push({ url: sourceUrl, error: error.message });
+      }
+    }
+    return sendJson(response, 201, { created, skipped, errors });
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/templates') {
-    return sendJson(response, 200, { templates: listTemplateCategories() });
+    return sendJson(response, 200, { templates: listTemplates(db) });
   }
 
   if (request.method === 'GET' && url.pathname === '/api/followups') {
@@ -125,8 +241,12 @@ export async function handleApi(request, response, db, url, runtimeConfig = conf
     const lead = getLead(db, Number(body.lead_id));
     if (!lead) return sendJson(response, 404, { error: 'Lead not found.' });
     const templateName = body.template_name === 'finalFollowup' ? 'finalFollowup' : 'followup';
+    const template = selectedTemplate(db, body.template_id, templateName);
+    if (!template) return sendJson(response, 404, { error: 'Template not found.' });
+    const product = selectedProduct(db, body.product_id);
+    if (body.product_id && !product) return sendJson(response, 404, { error: 'Product not found.' });
     const activeConfig = effectiveConfig(db, runtimeConfig);
-    const generated = renderDraftFromTemplate(lead, activeConfig.company, templateName);
+    const generated = renderDraftFromTemplate(lead, activeConfig.company, template, product);
     const draft = createDraft(db, { lead_id: lead.id, ...generated });
     createEvent(db, {
       lead_id: lead.id,
@@ -152,6 +272,88 @@ export async function handleApi(request, response, db, url, runtimeConfig = conf
     return sendJson(response, 200, { product });
   }
 
+  if (productMatch && request.method === 'DELETE') {
+    if (!deleteProduct(db, numericId(productMatch))) {
+      return sendJson(response, 404, { error: 'Product not found.' });
+    }
+    return sendJson(response, 200, { ok: true });
+  }
+
+  const sourcedLeadMatch = url.pathname.match(/^\/api\/sourced-leads\/(\d+)$/);
+  if (sourcedLeadMatch && request.method === 'PUT') {
+    const body = await readJson(request);
+    const sourcedLead = updateSourcedLead(db, numericId(sourcedLeadMatch), body);
+    if (!sourcedLead) return sendJson(response, 404, { error: 'Sourced lead not found.' });
+    return sendJson(response, 200, { sourced_lead: sourcedLead });
+  }
+
+  if (sourcedLeadMatch && request.method === 'DELETE') {
+    if (!deleteSourcedLead(db, numericId(sourcedLeadMatch))) {
+      return sendJson(response, 404, { error: 'Sourced lead not found.' });
+    }
+    return sendJson(response, 200, { ok: true });
+  }
+
+  const sourcedLeadImportMatch = url.pathname.match(/^\/api\/sourced-leads\/(\d+)\/import$/);
+  if (sourcedLeadImportMatch && request.method === 'POST') {
+    const sourcedLead = getSourcedLead(db, numericId(sourcedLeadImportMatch));
+    if (!sourcedLead) return sendJson(response, 404, { error: 'Sourced lead not found.' });
+    const existing = existingLeadForSourcedLead(db, sourcedLead);
+    if (existing) {
+      const updated = updateSourcedLead(db, sourcedLead.id, {
+        status: 'Imported',
+        imported_lead_id: existing.id
+      });
+      return sendJson(response, 200, { lead: existing, sourced_lead: updated, duplicate: true });
+    }
+
+    const lead = createLead(db, {
+      company_name: sourcedLead.company_name || sourcedLead.website || 'Unnamed sourced lead',
+      country_region: sourcedLead.country_region,
+      market_region: sourcedLead.market_region,
+      website: sourcedLead.website,
+      source_url: sourcedLead.source_url,
+      contact_name: sourcedLead.contact_name,
+      email: sourcedLead.email,
+      industry: sourcedLead.industry,
+      product_fit: sourcedLead.product_fit,
+      fit_reason: sourcedLead.fit_reason,
+      status: 'New',
+      notes: [
+        `Source: ${sourcedLead.source_type}${sourcedLead.source_name ? ` - ${sourcedLead.source_name}` : ''}`,
+        sourcedLead.notes
+      ].filter(Boolean).join('\n')
+    });
+    const updated = updateSourcedLead(db, sourcedLead.id, {
+      status: 'Imported',
+      imported_lead_id: lead.id
+    });
+    return sendJson(response, 201, { lead, sourced_lead: updated, duplicate: false });
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/templates') {
+    const body = await readJson(request);
+    if (!body.template_key && !body.label) return badRequest(response, 'Template key or label is required.');
+    if (!body.subject) return badRequest(response, 'Template subject is required.');
+    if (!body.body) return badRequest(response, 'Template body is required.');
+    return sendJson(response, 201, { template: createTemplate(db, body) });
+  }
+
+  const templateMatch = url.pathname.match(/^\/api\/templates\/(\d+)$/);
+  if (templateMatch && request.method === 'PUT') {
+    const body = await readJson(request);
+    const template = updateTemplate(db, numericId(templateMatch), body);
+    if (!template) return sendJson(response, 404, { error: 'Template not found.' });
+    return sendJson(response, 200, { template });
+  }
+
+  if (templateMatch && request.method === 'DELETE') {
+    const result = deleteTemplate(db, numericId(templateMatch));
+    if (result.reason === 'missing') return sendJson(response, 404, { error: 'Template not found.' });
+    if (result.reason === 'builtin') return sendJson(response, 400, { error: 'Built-in templates cannot be deleted.' });
+    return sendJson(response, 200, { ok: true });
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/drafts') {
     return sendJson(response, 200, { drafts: listDrafts(db) });
   }
@@ -162,7 +364,14 @@ export async function handleApi(request, response, db, url, runtimeConfig = conf
     if (!lead) return sendJson(response, 404, { error: 'Lead not found.' });
 
     const activeConfig = effectiveConfig(db, runtimeConfig);
-    const generated = await generateDraft(lead, activeConfig.company, activeConfig.ai, body.template_name);
+    const product = selectedProduct(db, body.product_id);
+    if (body.product_id && !product) return sendJson(response, 404, { error: 'Product not found.' });
+    const template = selectedTemplate(db, body.template_id, body.template_name);
+    if ((body.template_id || body.template_name) && !template) return sendJson(response, 404, { error: 'Template not found.' });
+    const useAi = body.generation_mode === 'ai';
+    const generated = useAi
+      ? await generateDraft(lead, activeConfig.company, activeConfig.ai, template, product)
+      : renderDraftFromTemplate(lead, activeConfig.company, template, product);
     const draft = createDraft(db, { lead_id: lead.id, ...generated });
     createEvent(db, {
       lead_id: lead.id,

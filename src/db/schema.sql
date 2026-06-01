@@ -81,6 +81,41 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS email_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  template_key TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  is_builtin INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sourced_leads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_type TEXT NOT NULL DEFAULT 'Website',
+  source_name TEXT NOT NULL DEFAULT '',
+  company_name TEXT NOT NULL DEFAULT '',
+  country_region TEXT NOT NULL DEFAULT '',
+  market_region TEXT NOT NULL DEFAULT '',
+  website TEXT NOT NULL DEFAULT '',
+  source_url TEXT NOT NULL DEFAULT '',
+  contact_name TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  industry TEXT NOT NULL DEFAULT '',
+  product_fit TEXT NOT NULL DEFAULT 'Both',
+  fit_reason TEXT NOT NULL DEFAULT '',
+  match_score INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'Review',
+  notes TEXT NOT NULL DEFAULT '',
+  imported_lead_id INTEGER,
+  raw_text TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (imported_lead_id) REFERENCES leads(id) ON DELETE SET NULL
+);
+
 INSERT INTO products (product_category, product_type, available_documents)
 SELECT 'Fiberglass Yarn', 'Fiberglass yarn / direct roving / plied yarn', 'TDS / COA / sample / quotation'
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE product_category = 'Fiberglass Yarn');
@@ -88,3 +123,126 @@ WHERE NOT EXISTS (SELECT 1 FROM products WHERE product_category = 'Fiberglass Ya
 INSERT INTO products (product_category, product_type, available_documents)
 SELECT 'Fiberglass Fabric', 'Fiberglass cloth / mesh fabric / woven fabric', 'TDS / COA / sample / quotation'
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE product_category = 'Fiberglass Fabric');
+
+INSERT OR IGNORE INTO email_templates (template_key, label, subject, body, is_builtin)
+VALUES (
+  'distributor',
+  'General importer or distributor',
+  'Fiberglass yarn and fabric supplier from China',
+  'Dear {{contact_name}},
+
+I am contacting you from {{sender_company}}, a China-based manufacturer of fiberglass materials.
+
+We supply {{product_line}} for industrial, construction, insulation, fire protection, transportation, and composite material applications. Specifications can be customized based on customer requirements.
+
+{{product_reference}}{{lead_context}} May I know if you currently purchase {{product_line}}?
+
+If relevant, we can provide product information, samples, and quotations for your review. Please share your required specification and application so we can check the suitable product information.
+
+{{signature}}
+
+If this is not relevant, please reply "unsubscribe" and we will not contact you again.',
+  1
+);
+
+INSERT OR IGNORE INTO email_templates (template_key, label, subject, body, is_builtin)
+VALUES (
+  'manufacturer',
+  'Manufacturer',
+  'Fiberglass materials for manufacturing applications',
+  'Dear {{contact_name}},
+
+I am contacting you from {{sender_company}}, a China-based manufacturer of fiberglass materials.
+
+We supply {{product_line}} for manufacturing, composite material, insulation, fire protection, transportation, and industrial applications. Specifications can be customized based on customer requirements.
+
+{{product_reference}}{{lead_context}} May I know if you currently purchase {{product_line}}?
+
+If relevant, we can provide product information, samples, and quotations for your review. Please share your required specification and application so we can check the suitable product information.
+
+{{signature}}
+
+If this is not relevant, please reply "unsubscribe" and we will not contact you again.',
+  1
+);
+
+INSERT OR IGNORE INTO email_templates (template_key, label, subject, body, is_builtin)
+VALUES (
+  'construction',
+  'Construction or insulation market',
+  'Fiberglass fabric for construction and insulation applications',
+  'Dear {{contact_name}},
+
+I am contacting you from {{sender_company}}, a China-based manufacturer of fiberglass materials.
+
+We supply {{product_line}} for construction, insulation, fire protection, transportation, and industrial applications. Specifications can be customized based on customer requirements.
+
+{{product_reference}}{{lead_context}} May I know if you currently purchase {{product_line}}?
+
+If relevant, we can provide product information, samples, and quotations for your review. Please share your required specification and application so we can check the suitable product information.
+
+{{signature}}
+
+If this is not relevant, please reply "unsubscribe" and we will not contact you again.',
+  1
+);
+
+INSERT OR IGNORE INTO email_templates (template_key, label, subject, body, is_builtin)
+VALUES (
+  'interestedReply',
+  'Customer interested reply',
+  'Fiberglass material information for your review',
+  'Dear {{contact_name}},
+
+Thank you for your reply.
+
+To recommend the right product, could you please share the following information?
+
+{{product_reference}}1. Product type: fiberglass yarn or fiberglass fabric
+2. Application
+3. Required specification or sample photo
+4. Estimated quantity
+5. Destination country or port
+6. Any packaging or certification requirements
+
+After receiving these details, we will check internally and send suitable product information and quotation.
+
+{{signature}}',
+  1
+);
+
+INSERT OR IGNORE INTO email_templates (template_key, label, subject, body, is_builtin)
+VALUES (
+  'followup',
+  'No-response follow-up',
+  'Follow-up - fiberglass yarn and fabric',
+  'Dear {{contact_name}},
+
+I wanted to follow up on my previous email about {{product_line}}.
+
+If your company is purchasing these materials, we would be glad to learn your requirements and check whether our products are suitable.
+
+If this is not your responsibility, could you please forward this email to the purchasing or product team?
+
+{{signature}}
+
+If this is not relevant, please reply "unsubscribe" and we will not contact you again.',
+  1
+);
+
+INSERT OR IGNORE INTO email_templates (template_key, label, subject, body, is_builtin)
+VALUES (
+  'finalFollowup',
+  'Final follow-up',
+  'Final follow-up - fiberglass materials',
+  'Dear {{contact_name}},
+
+This is my final follow-up regarding {{product_line}} supply.
+
+If these products are relevant to your business, please let me know your application and required specification. If not, no further action is needed.
+
+{{signature}}
+
+If this is not relevant, please reply "unsubscribe" and we will not contact you again.',
+  1
+);
